@@ -6,6 +6,37 @@
 Code for **"Discrete Diffusion Language Models Are Training-Free Multi-Label
 Classifiers."**
 
+## 🔍 How the method works
+
+Given a document $x$ and a label inventory
+$\Lambda = \{\lambda_1,\ldots,\lambda_m\}$, dLLM-SetScore evaluates each
+candidate label independently:
+
+1. It creates one short prompt per label, such as
+   `Document: <text> Question: Does this document express <label>? Answer: [MASK]`.
+   With $m$ candidate labels, the model processes $m$ prompts.
+2. A frozen masked diffusion language model scores `yes` and `no` at the single
+   masked answer position. It does not generate a free-form response or update
+   its weights.
+3. The label score is the log-odds
+   $u_i = \log p(\text{yes}\mid\text{prompt}_i) - \log p(\text{no}\mid\text{prompt}_i)$.
+   A larger score means that the document provides more support for that label.
+4. The method applies temperature scaling and a threshold to each score:
+   $\widehat y_i = 1$ when $\sigma(u_i/T) \geq \tau_i$. The temperature,
+   threshold strategy, and prompt template are selected on a labelled
+   200-example validation slice. Test labels are not used for these choices.
+
+Every label appears in the same syntactic answer position. This makes the
+predicted set independent of label ordering and avoids the slot-position
+artifact found when all labels and masks are packed into one long prompt. It
+does not remove biases caused by label wording or prompt choice, which is why
+the validation protocol matters.
+
+Here, "training-free" means that the diffusion backbone receives no
+task-specific fine-tuning and the method uses no NLI training data. It does
+not mean that the complete protocol is label-free: the small validation slice
+is used for prompt selection and calibration.
+
 <p align="center">
   <img
     src="docs/figures/dllm-setscore-schematic.png"
@@ -33,13 +64,10 @@ The Reuters hybrid includes the few-shot supervised SetFit component, so it is
 a reference result rather than a training-free method. Each metric pair comes
 from one operating point.
 
-dLLM-SetScore turns a masked discrete-diffusion language model into a
-multi-label classifier without task-specific backbone fine-tuning. The
-recommended method asks one yes/no question per candidate label and scores the
-log-odds of the single masked answer position. The repository also includes the
-all-masked multi-slot scorer used for the positional-asymmetry diagnostic,
-local Joint Set Refinement (JSR), calibration, baselines, prompt sweeps, and
-multi-seed aggregation.
+The repository also includes the all-masked multi-slot scorer used for the
+positional-asymmetry diagnostic, local Joint Set Refinement (JSR), calibration,
+baselines, prompt sweeps, and multi-seed aggregation. Per-label scoring is the
+recommended default; local JSR is included as a negative-result experiment.
 
 > 📦 **Source-only release.** This repository excludes reported result files,
 > predictions, datasets, caches, plots, logs, trained weights, and checkpoints.
