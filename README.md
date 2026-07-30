@@ -13,6 +13,17 @@
 These examples show the task rather than saved outputs from the paper runs. The
 actual prediction depends on the model, prompt, and calibrated thresholds.
 
+### Watch one prediction unfold
+
+<p align="center">
+  <img
+    src="docs/figures/label-prediction-demo.gif"
+    alt="Animated example of dLLM-SetScore masking and revealing a yes or no answer for love, nervousness, and anger before assembling the final label set"
+    width="100%"
+  >
+</p>
+<p align="center"><em>Conceptual example with illustrative scores. The method compares yes and no at the masked answer position; it does not generate a free-form answer.</em></p>
+
 **Want to know more?** Follow [how the scoring works](#-how-the-method-works),
 see [what it reveals about diffusion models](#-why-this-is-interesting-for-diffusion-models),
 or [reproduce a paper experiment](#-reproducing-the-paper-experiments).
@@ -134,7 +145,7 @@ recommended default; local JSR is included as a negative-result experiment.
 ```text
 .
 ├── pyproject.toml
-├── docs/figures/               # README schematic and editable TikZ source
+├── docs/figures/               # README visuals and their editable sources
 ├── src/dllm_setscore/
 │   ├── core.py                 # datasets, models, scoring, calibration, metrics
 │   ├── cli.py                  # main experiment and baseline CLI
