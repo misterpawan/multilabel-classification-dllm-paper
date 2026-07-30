@@ -2,6 +2,21 @@
 
 **TL;DR:** We use a diffusion language model to assign multiple labels to a document by asking one yes/no question for each label, without retraining the model.
 
+### Three quick examples
+
+| Input text | Illustrative label set |
+|---|---|
+| "Acme bought a rival and reported record quarterly earnings." | `acquisitions`, `earnings` |
+| "I love the result, but I am nervous about tomorrow." | `love`, `nervousness` |
+| "I will hurt you, you idiot." | `toxic`, `a threat`, `an insult` |
+
+These examples show the task rather than saved outputs from the paper runs. The
+actual prediction depends on the model, prompt, and calibrated thresholds.
+
+**Want to know more?** Follow [how the scoring works](#-how-the-method-works),
+see [what it reveals about diffusion models](#-why-this-is-interesting-for-diffusion-models),
+or [reproduce a paper experiment](#-reproducing-the-paper-experiments).
+
 > [!TIP]
 > **🤠 From [AI Wranglers](https://aiwranglers.org/)**
 >
