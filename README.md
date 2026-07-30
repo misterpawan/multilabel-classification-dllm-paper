@@ -1,5 +1,15 @@
 # 🧩 dLLM-SetScore
 
+> [!TIP]
+> **🤠 From [AI Wranglers](https://aiwranglers.org/)**
+>
+> **Learn. Research. Play. Join our team!**
+>
+> AI Wranglers is a friendly one-stop place for learning AI, doing research,
+> and turning ideas into useful applications. Curious newcomers, seasoned
+> researchers, and enthusiastic tinkerers are all welcome. Bring your
+> curiosity; cowboy hats and warehouse-sized GPU clusters are optional. 🙂
+
 > A masked diffusion model, one yes/no question per label, and no
 > task-specific backbone training. That is the whole idea. 🙂
 
