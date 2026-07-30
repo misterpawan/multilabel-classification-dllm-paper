@@ -56,6 +56,34 @@ is used for prompt selection and calibration.
 </p>
 <p align="center"><em>All-masked scoring has a slot-position artifact; per-label entailment puts every label in the same answer position.</em></p>
 
+## 🌀 Why this is interesting for diffusion models
+
+Multi-label classification is a useful stress test for a diffusion language
+model. A document can express several labels at once, so the output is a set
+rather than one fluent answer. The model must make repeated, comparable
+decisions about the same text.
+
+Masked diffusion models learn to recover corrupted tokens. dLLM-SetScore asks
+whether the probability at one masked `yes`/`no` position can serve as evidence
+for each label. This simple setup exposes behavior that ordinary text
+generation can make hard to notice:
+
+- Prompt layout can dominate the score. In our experiments, packing every label
+  into one long masked suffix creates a strong first-slot bias. Giving each
+  label its own prompt removes this particular order effect.
+- Semantic evidence and decision calibration are different jobs. The diffusion
+  model supplies log-odds; validation data selects the prompt, temperature, and
+  thresholds that turn those scores into a predicted set.
+- Local consistency does not automatically produce better set predictions. The
+  explored JSR updates sound reasonable but reduce F1, so a locally preferred
+  label change need not improve the complete label set.
+
+These results do not show that diffusion language models are universally
+better classifiers. They show that denoising scores can be reused without
+fine-tuning the backbone, and that multi-label prediction makes both useful
+signals and model quirks visible label by label. That is the fun part: the
+classifier doubles as a small microscope for the model. 🔬
+
 ## 🌟 Key results at a glance
 
 Scores are the seed-13 micro-F1 / macro-F1 percentages from the camera-ready
