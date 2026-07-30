@@ -6,6 +6,15 @@
 Code for **"Discrete Diffusion Language Models Are Training-Free Multi-Label
 Classifiers."**
 
+<p align="center">
+  <img
+    src="docs/figures/dllm-setscore-schematic.png"
+    alt="Schematic comparing all-masked multi-slot scoring with per-label entailment scoring in dLLM-SetScore"
+    width="100%"
+  >
+</p>
+<p align="center"><em>All-masked scoring has a slot-position artifact; per-label entailment puts every label in the same answer position.</em></p>
+
 ## 🌟 Key results at a glance
 
 Scores are the seed-13 micro-F1 / macro-F1 percentages from the camera-ready
@@ -42,6 +51,7 @@ multi-seed aggregation.
 ```text
 .
 ├── pyproject.toml
+├── docs/figures/               # README schematic and editable TikZ source
 ├── src/dllm_setscore/
 │   ├── core.py                 # datasets, models, scoring, calibration, metrics
 │   ├── cli.py                  # main experiment and baseline CLI
