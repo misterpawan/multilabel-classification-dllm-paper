@@ -1,5 +1,7 @@
 # 🧩 dLLM-SetScore
 
+**TL;DR:** We use a diffusion language model to assign multiple labels to a document by asking one yes/no question for each label, without retraining the model.
+
 > [!TIP]
 > **🤠 From [AI Wranglers](https://aiwranglers.org/)**
 >
