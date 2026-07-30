@@ -1,7 +1,28 @@
-# dLLM-SetScore
+# 🧩 dLLM-SetScore
 
-Code for **“Discrete Diffusion Language Models Are Training-Free Multi-Label
-Classifiers.”**
+> A masked diffusion model, one yes/no question per label, and no
+> task-specific backbone training. That is the whole idea. 🙂
+
+Code for **"Discrete Diffusion Language Models Are Training-Free Multi-Label
+Classifiers."**
+
+## 🌟 Key results at a glance
+
+Scores are the seed-13 micro-F1 / macro-F1 percentages from the camera-ready
+paper. Prompt tuning and calibration use the 200-example validation slice,
+never the test labels.
+
+| | Setting | Micro / macro F1 |
+|---|---|---:|
+| 🙂 | GoEmotions, LLaDA-Instruct with the "feeling" prompt | **29.5 / 24.8** |
+| 📰 | Reuters, LLaDA-Instruct with the "main topic" prompt | **80.5 / 68.8** |
+| ⚖️ | ECtHR, LLaDA-Instruct with the default prompt | **48.8 / 43.3** |
+| 💬 | Jigsaw, LLaDA-Instruct with the "contains" prompt | **45.1 / 28.5** |
+| 🧪 | Reuters hybrid: BART + SetFit + LLaDA-Instruct | **82.4 / 79.3** |
+
+The Reuters hybrid includes the few-shot supervised SetFit component, so it is
+a reference result rather than a training-free method. Each metric pair comes
+from one operating point.
 
 dLLM-SetScore turns a masked discrete-diffusion language model into a
 multi-label classifier without task-specific backbone fine-tuning. The
@@ -11,12 +32,12 @@ all-masked multi-slot scorer used for the positional-asymmetry diagnostic,
 local Joint Set Refinement (JSR), calibration, baselines, prompt sweeps, and
 multi-seed aggregation.
 
-This is a source-only reproducibility release. It intentionally excludes all
-reported result files, predictions, datasets, caches, plots, logs, trained
-weights, checkpoints, and other generated artifacts. Running the commands
-below creates local outputs under `runs/`, which is ignored by Git.
+> 📦 **Source-only release.** This repository excludes reported result files,
+> predictions, datasets, caches, plots, logs, trained weights, and checkpoints.
+> The commands below create local outputs under the Git-ignored `runs/`
+> directory.
 
-## Repository contents
+## 🗂️ Repository contents
 
 ```text
 .
@@ -43,7 +64,7 @@ The large development notebook, manuscript-build scripts, upload utilities,
 and machine-specific maintenance tools are not needed to reproduce the
 experiments and are not included.
 
-## Environment
+## 🛠️ Environment
 
 The paper experiments used:
 
@@ -90,7 +111,7 @@ python -m dllm_setscore --help
 PYTHONPATH=src python scripts/check_components.py
 ```
 
-## Datasets
+## 📚 Datasets
 
 Five datasets are fetched by Hugging Face Datasets when first requested:
 
@@ -138,7 +159,7 @@ python -m dllm_setscore \
   --datasets goemotions reuters21578_top20
 ```
 
-## Reproducing the paper experiments
+## 🧪 Reproducing the paper experiments
 
 All commands below write new files below `runs/main`. No precomputed scores or
 reported results are required.
@@ -330,7 +351,7 @@ Do not use the test labels to choose a prompt, calibration strategy, or
 ensemble. The 200-example validation slice is the selection set; test data is
 for the final report only.
 
-## Output layout
+## 📦 Output layout
 
 Each command records its configuration and generated predictions below:
 
@@ -349,7 +370,7 @@ runs/main/
 These paths are reproducibility products, not source files, and are excluded
 from version control.
 
-## Reproducibility notes
+## ✅ Reproducibility notes
 
 - Set `DLLM_SEED` before starting each process. The default is 13.
 - Keep `--max-val-examples 200` for the paper protocol.
@@ -365,7 +386,7 @@ from version control.
 - Record the Git commit, model and dataset revisions, command, seed, GPU, and
   package versions for every archival run.
 
-## Artifact policy
+## 🧹 Artifact policy
 
 Do not commit:
 
@@ -377,7 +398,7 @@ Do not commit:
 
 The `.gitignore` enforces these exclusions.
 
-## Citation
+## 📝 Citation
 
 ```bibtex
 @inproceedings{kumar2026dllmsetscore,
@@ -388,7 +409,7 @@ The `.gitignore` enforces these exclusions.
 }
 ```
 
-## License
+## 📄 License
 
 The code is distributed under the Apache License 2.0. Datasets and pretrained
 models retain their original licenses and terms.
