@@ -1,1 +1,348 @@
-# multilabel-classification-dllm-paper
+# dLLM-SetScore
+
+Code for **“Discrete Diffusion Language Models Are Training-Free Multi-Label
+Classifiers.”**
+
+dLLM-SetScore turns a masked discrete-diffusion language model into a
+multi-label classifier without task-specific backbone fine-tuning. The
+recommended method asks one yes/no question per candidate label and scores the
+log-odds of the single masked answer position. The repository also includes the
+all-masked multi-slot scorer used for the positional-asymmetry diagnostic,
+local Joint Set Refinement (JSR), calibration, baselines, prompt sweeps, and
+multi-seed aggregation.
+
+This is a source-only reproducibility release. It intentionally excludes all
+reported result files, predictions, datasets, caches, plots, logs, trained
+weights, checkpoints, and other generated artifacts. Running the commands
+below creates local outputs under `runs/`, which is ignored by Git.
+
+## Repository contents
+
+```text
+.
+├── pyproject.toml
+├── src/dllm_setscore/
+│   ├── core.py                 # datasets, models, scoring, calibration, metrics
+│   ├── cli.py                  # main experiment and baseline CLI
+│   └── config.py               # reusable defaults
+└── scripts/
+    ├── llada_per_label.py      # recommended per-label entailment scorer
+    ├── llada_permuted_unary.py # all-masked permutation diagnostic
+    ├── jsr_from_unary.py       # local-JSR negative-result experiment
+    ├── bart_template_search.py # BART-MNLI validation template search
+    ├── ensemble_sweep.py       # post-hoc convex ensemble analysis
+    ├── recalibrate.py          # calibration ablation over saved predictions
+    ├── aggregate_seeds.py      # mean/std across seeded runs
+    ├── final_summary.py        # compact Markdown result summary
+    ├── make_positional_bias_plot.py
+    ├── check_components.py
+    └── show_results.py
+```
+
+The large development notebook, manuscript-build scripts, upload utilities,
+and machine-specific maintenance tools are not needed to reproduce the
+experiments and are not included.
+
+## Environment
+
+The paper experiments used:
+
+- Python 3.10 or newer
+- one NVIDIA RTX 5090 with 32 GB VRAM
+- PyTorch 2.11 with CUDA 12.8
+- Transformers 4.49
+- bfloat16 inference for LLaDA-8B and Dream-7B
+- seed 13 for headline runs, with seeds 17 and 23 for replication
+
+Create an isolated environment:
+
+```bash
+git clone https://github.com/misterpawan/multilabel-classification-dllm-paper.git
+cd multilabel-classification-dllm-paper
+
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+
+# Select the PyTorch wheel appropriate for your CUDA installation.
+pip install --index-url https://download.pytorch.org/whl/cu128 "torch==2.11.*"
+pip install -e . "transformers==4.49.*"
+```
+
+The diffusion models are downloaded from Hugging Face on first use. Set a
+cache location with enough free space:
+
+```bash
+export HF_HOME=/path/to/huggingface-cache
+```
+
+If your Hugging Face account or a model requires authentication, set
+`HF_TOKEN` in the shell. Never commit that token.
+
+Check the installation without downloading a model:
+
+```bash
+python -m compileall -q src scripts
+python -m dllm_setscore --help
+PYTHONPATH=src python scripts/check_components.py
+```
+
+## Datasets
+
+Five datasets are fetched by Hugging Face Datasets when first requested:
+
+- GoEmotions: `google-research-datasets/go_emotions`
+- Reuters-21578: `Tellurio/reuters-21578` (ModApte, top 20 topics)
+- EURLEX57K: `coastalcph/lex_glue`, configuration `eurlex`
+- ECtHR Task A: `coastalcph/lex_glue`, configuration `ecthr_a`
+- Jigsaw Toxic Comment Classification:
+  `thesofakillers/jigsaw-toxic-comment-classification-challenge`
+
+AAPD is downloaded separately:
+
+```bash
+mkdir -p data/aapd
+curl -L https://zenodo.org/records/6344750/files/AAPD.zip -o /tmp/AAPD.zip
+unzip /tmp/AAPD.zip -d data/aapd
+```
+
+The loader expects `data/aapd/train.csv`, `data/aapd/dev.csv`, and
+`data/aapd/test.csv`. Dataset files are ignored by Git.
+
+Verify dataset loading with a small command:
+
+```bash
+python -m dllm_setscore \
+  --mode describe \
+  --datasets goemotions reuters21578_top20
+```
+
+## Reproducing the paper experiments
+
+All commands below write new files below `runs/main`. No precomputed scores or
+reported results are required.
+
+### 1. Recommended per-label scorer
+
+Run LLaDA Base and Instruct:
+
+```bash
+for dataset in \
+  goemotions reuters21578_top20 eurlex57k ecthr_a jigsaw_toxic aapd
+do
+  for backbone in llada llada_instruct
+  do
+    DLLM_SEED=13 python scripts/llada_per_label.py \
+      --datasets "$dataset" \
+      --backbone "$backbone" \
+      --root runs/main \
+      --max-val-examples 200 \
+      --max-test-examples 1500
+  done
+done
+```
+
+Run the independent Dream-7B Base/Instruct replication:
+
+```bash
+for dataset in \
+  goemotions reuters21578_top20 eurlex57k ecthr_a jigsaw_toxic aapd
+do
+  for backbone in dream dream_instruct
+  do
+    DLLM_SEED=13 python scripts/llada_per_label.py \
+      --datasets "$dataset" \
+      --backbone "$backbone" \
+      --root runs/main \
+      --max-val-examples 200 \
+      --max-test-examples 1500
+  done
+done
+```
+
+The script verifies that the `yes` and `no` verbalizers are single tokens,
+tunes calibration on the validation slice, and evaluates the resulting
+thresholds on the test slice.
+
+### 2. BART-MNLI and SetFit baselines
+
+```bash
+python -m dllm_setscore \
+  --mode main \
+  --datasets \
+    goemotions reuters21578_top20 eurlex57k \
+    ecthr_a jigsaw_toxic aapd \
+  --backbones llada \
+  --include bart_mnli setfit \
+  --root runs/main \
+  --max-val-examples 200 \
+  --max-test-examples 1500
+```
+
+Search BART-MNLI templates on the validation subset:
+
+```bash
+PYTHONPATH=src python scripts/bart_template_search.py \
+  --datasets goemotions reuters21578_top20 eurlex57k \
+  --root runs/main \
+  --max-val-examples 200 \
+  --max-test-examples 1500
+```
+
+SetFit is a few-shot supervised baseline, not a training-free method.
+
+### 3. All-masked scorer and positional asymmetry
+
+Generate the all-masked unary and local-JSR runs:
+
+```bash
+python -m dllm_setscore \
+  --mode main \
+  --datasets goemotions reuters21578_top20 \
+  --backbones llada \
+  --include dllm \
+  --root runs/main \
+  --max-val-examples 200 \
+  --max-test-examples 1500
+```
+
+Run the label-permutation diagnostic:
+
+```bash
+PYTHONPATH=src python scripts/llada_permuted_unary.py \
+  --datasets goemotions reuters21578_top20 \
+  --root runs/main \
+  --max-val-examples 200 \
+  --max-test-examples 1500 \
+  --n-permutations 4
+```
+
+Plot an all-masked prediction artifact:
+
+```bash
+PYTHONPATH=src python scripts/make_positional_bias_plot.py \
+  --predictions \
+    runs/main/results/predictions/<run-directory>/predictions.npz \
+  --dataset goemotions \
+  --out runs/main/plots/positional_bias.png
+```
+
+Use a real generated directory in place of `<run-directory>`.
+
+### 4. Prompt-template sensitivity
+
+`llada_per_label.py` accepts any format string containing `{label}`:
+
+```bash
+DLLM_SEED=13 python scripts/llada_per_label.py \
+  --datasets reuters21578_top20 \
+  --backbone llada_instruct \
+  --root runs/main \
+  --question-template $'\n\nQuestion: Is the main topic of this article {label}?\nAnswer:' \
+  --method-suffix topic \
+  --max-val-examples 200 \
+  --max-test-examples 1500
+```
+
+Use analogous dataset-appropriate templates for the GoEmotions and Jigsaw
+sweeps. Template selection must use validation performance only.
+
+### 5. Multi-seed replication
+
+The paper uses seeds 13, 17, and 23:
+
+```bash
+for seed in 13 17 23
+do
+  DLLM_SEED="$seed" python scripts/llada_per_label.py \
+    --datasets goemotions reuters21578_top20 ecthr_a \
+    --backbone llada_instruct \
+    --root runs/main \
+    --method-suffix "seed${seed}" \
+    --max-val-examples 200 \
+    --max-test-examples 1500
+done
+
+PYTHONPATH=src python scripts/aggregate_seeds.py --root runs/main
+```
+
+### 6. Calibration and ensemble analysis
+
+These commands operate only on predictions generated locally by the earlier
+steps:
+
+```bash
+PYTHONPATH=src python scripts/recalibrate.py \
+  --root runs/main \
+  --strategies global labelwise expected_cardinality \
+  --out runs/main/tables/recalibrated.csv
+
+PYTHONPATH=src python scripts/ensemble_sweep.py \
+  --root runs/main \
+  --out runs/main/tables/ensemble.csv
+```
+
+Do not use the test labels to choose a prompt, calibration strategy, or
+ensemble. The 200-example validation slice is the selection set; test data is
+for the final report only.
+
+## Output layout
+
+Each command records its configuration and generated predictions below:
+
+```text
+runs/main/
+├── cache/
+├── results/
+│   ├── main_results.jsonl
+│   └── predictions/<dataset>_<method>_<config-hash>/
+│       ├── config.json
+│       └── predictions.npz
+├── plots/
+└── tables/
+```
+
+These paths are reproducibility products, not source files, and are excluded
+from version control.
+
+## Reproducibility notes
+
+- Set `DLLM_SEED` before starting each process. The default is 13.
+- Keep `--max-val-examples 200` for the paper protocol.
+- The paper uses deterministic prefixes of official test splits, capped at
+  800–1500 examples depending on dataset availability.
+- EURLEX57K uses an SBERT shortlist of 32 labels; the other reported datasets
+  use their full label inventories.
+- Model repositories use `trust_remote_code=True`. Review the downloaded
+  model code and pin model revisions for archival replication.
+- Exact scores can vary with GPU kernels, model revisions, and library
+  versions. Record the Git commit, model revision, command, seed, and package
+  versions for every archival run.
+
+## Artifact policy
+
+Do not commit:
+
+- `runs/`, `results/`, predictions, score arrays, or generated tables
+- datasets or Hugging Face caches
+- model weights, checkpoints, or optimizer states
+- logs, plots, notebooks with embedded output, or temporary files
+- credentials or environment files
+
+The `.gitignore` enforces these exclusions.
+
+## Citation
+
+```bibtex
+@inproceedings{kumar2026dllmsetscore,
+  title     = {Discrete Diffusion Language Models Are Training-Free Multi-Label Classifiers},
+  author    = {Pawan Kumar},
+  booktitle = {Proceedings of the 2026 SIAM International Conference on Data Mining},
+  year      = {2026}
+}
+```
+
+## License
+
+The code is distributed under the Apache License 2.0. Datasets and pretrained
+models retain their original licenses and terms.

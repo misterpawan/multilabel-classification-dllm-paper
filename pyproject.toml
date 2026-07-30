@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dllm-setscore"
+version = "0.1.0"
+description = "dLLM-SetScore: training-free multi-label text classification with discrete diffusion language models."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Pawan Kumar", email = "pawan.kumar@iiit.ac.in" }]
+dependencies = [
+    "torch>=2.7",
+    "transformers>=4.46,<4.60",
+    "datasets>=3.0",
+    "accelerate>=1.0",
+    "sentence-transformers>=3.0",
+    "scikit-learn>=1.4",
+    "iterative-stratification>=0.1.9",
+    "pandas>=2.0",
+    "numpy>=1.26,<2.4",
+    "scipy>=1.11",
+    "matplotlib>=3.8",
+    "pyarrow>=15.0",
+    "huggingface_hub>=0.26",
+    "tqdm>=4.66",
+    "sentencepiece",
+    "protobuf",
+    "requests>=2.31",
+]
+
+[project.scripts]
+dllm-setscore = "dllm_setscore.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -216,3 +216,42 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Paper experiment outputs and downloaded data
+runs/
+results/
+outputs/
+artifacts/
+data/
+logs/
+plots/
+tables/
+cache/
+.cache/
+hf_cache/
+wandb/
+
+# Model weights, checkpoints, and serialized arrays
+checkpoints/
+saved_models/
+models/
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.safetensors
+*.onnx
+*.npz
+*.npy
+*.pkl
+*.pickle
+*.arrow
+*.parquet
+
+# Generated reports and local credentials
+*.jsonl
+*.csv
+*.tsv
+*.pdf
+.env.*
+!.env.example
