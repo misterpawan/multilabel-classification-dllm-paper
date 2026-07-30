@@ -69,11 +69,14 @@ pip install --index-url https://download.pytorch.org/whl/cu128 "torch==2.11.*"
 pip install -e . "transformers==4.49.*"
 ```
 
-The diffusion models are downloaded from Hugging Face on first use. Set a
-cache location with enough free space:
+The diffusion models are downloaded from Hugging Face on first use. Set
+`HF_HOME` to a writable location with enough free space. This explicit setting
+also avoids inheriting a machine-wide cache path that the current user cannot
+write:
 
 ```bash
-export HF_HOME=/path/to/huggingface-cache
+export HF_HOME="$PWD/runs/huggingface"
+mkdir -p "$HF_HOME"
 ```
 
 If your Hugging Face account or a model requires authentication, set
@@ -109,6 +112,24 @@ unzip /tmp/AAPD.zip -d data/aapd
 The loader expects `data/aapd/train.csv`, `data/aapd/dev.csv`, and
 `data/aapd/test.csv`. Dataset files are ignored by Git.
 
+The result-producing protocol uses the following validation sources, test
+sources, and caps. A cap is applied after the dataset loader has constructed
+the split.
+
+| Dataset | Validation source | Test source | Validation cap | Test cap | Scored labels |
+|---|---|---|---:|---:|---:|
+| GoEmotions | official validation | official test prefix | 200 | 1500 | 28 |
+| Reuters-21578 | seeded 10% split of ModApte training data | ModApte test prefix | 200 | 1500 | top 20 |
+| EURLEX57K | official validation | official test prefix | 200 | 800 | SBERT shortlist of 32 from 100 |
+| ECtHR Task A | official validation | official test split | 200 | 1000 | 10 |
+| Jigsaw Toxic | seeded split of the labeled training release | seeded test pool | 200 | 1500 | 6 |
+| AAPD | official development split | official test split | 200 | 1000 | 54 |
+
+For GoEmotions, EURLEX57K, ECtHR, and AAPD, changing `DLLM_SEED`
+does not change the official validation or test prefix. Reuters uses the seed
+when constructing its validation split. Jigsaw uses it when constructing both
+validation and test pools. Use seed 13 for the headline rows.
+
 Verify dataset loading with a small command:
 
 ```bash
@@ -127,9 +148,13 @@ reported results are required.
 Run LLaDA Base and Instruct:
 
 ```bash
-for dataset in \
-  goemotions reuters21578_top20 eurlex57k ecthr_a jigsaw_toxic aapd
+datasets=(goemotions reuters21578_top20 eurlex57k ecthr_a jigsaw_toxic aapd)
+test_caps=(1500 1500 800 1000 1500 1000)
+
+for i in "${!datasets[@]}"
 do
+  dataset="${datasets[$i]}"
+  test_cap="${test_caps[$i]}"
   for backbone in llada llada_instruct
   do
     DLLM_SEED=13 python scripts/llada_per_label.py \
@@ -137,7 +162,8 @@ do
       --backbone "$backbone" \
       --root runs/main \
       --max-val-examples 200 \
-      --max-test-examples 1500
+      --max-test-examples "$test_cap" \
+      --batch-size 64
   done
 done
 ```
@@ -145,9 +171,13 @@ done
 Run the independent Dream-7B Base/Instruct replication:
 
 ```bash
-for dataset in \
-  goemotions reuters21578_top20 eurlex57k ecthr_a jigsaw_toxic aapd
+datasets=(goemotions reuters21578_top20 eurlex57k ecthr_a jigsaw_toxic aapd)
+test_caps=(1500 1500 800 1000 1500 1000)
+
+for i in "${!datasets[@]}"
 do
+  dataset="${datasets[$i]}"
+  test_cap="${test_caps[$i]}"
   for backbone in dream dream_instruct
   do
     DLLM_SEED=13 python scripts/llada_per_label.py \
@@ -155,38 +185,50 @@ do
       --backbone "$backbone" \
       --root runs/main \
       --max-val-examples 200 \
-      --max-test-examples 1500
+      --max-test-examples "$test_cap" \
+      --batch-size 64
   done
 done
 ```
 
 The script verifies that the `yes` and `no` verbalizers are single tokens,
 tunes calibration on the validation slice, and evaluates the resulting
-thresholds on the test slice.
+thresholds on the test slice. Batch size changes throughput and memory use, not
+the validation-selected decision rule.
 
 ### 2. BART-MNLI and SetFit baselines
 
 ```bash
-python -m dllm_setscore \
-  --mode main \
-  --datasets \
-    goemotions reuters21578_top20 eurlex57k \
-    ecthr_a jigsaw_toxic aapd \
-  --backbones llada \
-  --include bart_mnli setfit \
-  --root runs/main \
-  --max-val-examples 200 \
-  --max-test-examples 1500
+datasets=(goemotions reuters21578_top20 eurlex57k ecthr_a jigsaw_toxic aapd)
+test_caps=(1500 1500 800 1000 1500 1000)
+
+for i in "${!datasets[@]}"
+do
+  python -m dllm_setscore \
+    --mode main \
+    --datasets "${datasets[$i]}" \
+    --backbones llada \
+    --include bart_mnli setfit \
+    --root runs/main \
+    --max-val-examples 200 \
+    --max-test-examples "${test_caps[$i]}"
+done
 ```
 
 Search BART-MNLI templates on the validation subset:
 
 ```bash
-PYTHONPATH=src python scripts/bart_template_search.py \
-  --datasets goemotions reuters21578_top20 eurlex57k \
-  --root runs/main \
-  --max-val-examples 200 \
-  --max-test-examples 1500
+datasets=(goemotions reuters21578_top20 eurlex57k)
+test_caps=(1500 1500 800)
+
+for i in "${!datasets[@]}"
+do
+  PYTHONPATH=src python scripts/bart_template_search.py \
+    --datasets "${datasets[$i]}" \
+    --root runs/main \
+    --max-val-examples 200 \
+    --max-test-examples "${test_caps[$i]}"
+done
 ```
 
 SetFit is a few-shot supervised baseline, not a training-free method.
@@ -241,7 +283,8 @@ DLLM_SEED=13 python scripts/llada_per_label.py \
   --question-template $'\n\nQuestion: Is the main topic of this article {label}?\nAnswer:' \
   --method-suffix topic \
   --max-val-examples 200 \
-  --max-test-examples 1500
+  --max-test-examples 1500 \
+  --batch-size 64
 ```
 
 Use analogous dataset-appropriate templates for the GoEmotions and Jigsaw
@@ -260,7 +303,8 @@ do
     --root runs/main \
     --method-suffix "seed${seed}" \
     --max-val-examples 200 \
-    --max-test-examples 1500
+    --max-test-examples 1500 \
+    --batch-size 64
 done
 
 PYTHONPATH=src python scripts/aggregate_seeds.py --root runs/main
@@ -309,15 +353,17 @@ from version control.
 
 - Set `DLLM_SEED` before starting each process. The default is 13.
 - Keep `--max-val-examples 200` for the paper protocol.
-- The paper uses deterministic prefixes of official test splits, capped at
-  800–1500 examples depending on dataset availability.
+- Use the per-dataset test caps in the protocol table. A single cap for the
+  complete suite does not reproduce the result-producing slices.
+- Prompt choice, calibration strategy, temperature, thresholds, and ensemble
+  weights must be selected on validation data. Test labels are used only for
+  the final report.
 - EURLEX57K uses an SBERT shortlist of 32 labels; the other reported datasets
   use their full label inventories.
 - Model repositories use `trust_remote_code=True`. Review the downloaded
   model code and pin model revisions for archival replication.
-- Exact scores can vary with GPU kernels, model revisions, and library
-  versions. Record the Git commit, model revision, command, seed, and package
-  versions for every archival run.
+- Record the Git commit, model and dataset revisions, command, seed, GPU, and
+  package versions for every archival run.
 
 ## Artifact policy
 
