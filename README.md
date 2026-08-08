@@ -135,10 +135,50 @@ positional-asymmetry diagnostic, local Joint Set Refinement (JSR), calibration,
 baselines, prompt sweeps, and multi-seed aggregation. Per-label scoring is the
 recommended default; local JSR is included as a negative-result experiment.
 
-> 📦 **Source-only release.** This repository excludes reported result files,
-> predictions, datasets, caches, plots, logs, trained weights, and checkpoints.
-> The commands below create local outputs under the Git-ignored `runs/`
-> directory.
+> 📦 **Source release plus artifact archive.** This Git repository contains the
+> reproducibility code, editable figure sources, and a checked-in spot-check
+> table. Full model checkpoints and generated prediction artifacts are kept in
+> the private [Hugging Face artifact archive](https://huggingface.co/misterpawan/github-checkpoints-private/tree/main/dllm-setscore)
+> so that Git remains lightweight. The commands below create complete local
+> outputs under the Git-ignored `runs/` directory.
+
+## 🤗 Checkpoints and archived artifacts
+
+The training-free dLLM-SetScore experiments do not require a task-trained
+checkpoint: download the LLaDA or Dream backbone named by the command and run
+the per-label scorer. The HF archive contains checkpoints for the supervised
+baselines and their associated prediction artifacts. For example, the
+Reuters-21578 BERT baseline is available at
+[`dllm-setscore/reuters21578_top20/bert_base_supervised`](https://huggingface.co/misterpawan/github-checkpoints-private/tree/main/dllm-setscore/reuters21578_top20/bert_base_supervised).
+
+Download and use that checkpoint locally:
+
+```bash
+source "$HOME/.profile"
+mkdir -p runs/hf_checkpoints
+hf download "$HF_REPO" \
+  --repo-type model \
+  --include 'dllm-setscore/reuters21578_top20/bert_base_supervised/*' \
+  --local-dir runs/hf_checkpoints \
+  --token "$HF_TOKEN"
+```
+
+The resulting directory can be passed to the usual Transformers loaders:
+
+```python
+import os
+from pathlib import Path
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+checkpoint = Path("runs/hf_checkpoints/dllm-setscore/reuters21578_top20/bert_base_supervised")
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+model = AutoModelForSequenceClassification.from_pretrained(checkpoint)
+```
+
+The complete checkpoint index is in the
+[HF `dllm-setscore/checkpoints` directory](https://huggingface.co/misterpawan/github-checkpoints-private/tree/main/dllm-setscore/checkpoints).
+The archive is private, so an authenticated HF account and `HF_TOKEN` are
+required. Do not commit that token.
 
 ## 🗂️ Repository contents
 
@@ -472,7 +512,9 @@ runs/main/
 ```
 
 These paths are reproducibility products, not source files, and are excluded
-from version control.
+from version control. The checked-in
+[`results/spot_check.csv`](results/spot_check.csv) is only a small, explicitly
+labeled smoke-test summary; it is not a replacement for the full paper runs.
 
 ## ✅ Reproducibility notes
 
@@ -492,9 +534,10 @@ from version control.
 
 ## 🧹 Artifact policy
 
-Do not commit:
+Do not commit generated local outputs, except for the intentionally checked-in
+spot-check summary:
 
-- `runs/`, `results/`, predictions, score arrays, or generated tables
+- `runs/`, full `results/`, predictions, score arrays, or generated tables
 - datasets or Hugging Face caches
 - model weights, checkpoints, or optimizer states
 - logs, plots, notebooks with embedded output, or temporary files
